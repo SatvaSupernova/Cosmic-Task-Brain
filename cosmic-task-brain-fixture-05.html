@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#02040a">
+<title>Cosmic Task Brain — Spatial Fixture</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#02040a;color:#eef4ff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overscroll-behavior:none}
+body,#app,canvas{touch-action:none}
+#app{position:fixed;inset:0;overflow:hidden;background:radial-gradient(circle at 50% 45%,#08111f 0,#030711 48%,#010207 100%);user-select:none;-webkit-user-select:none}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#hud{position:absolute;left:max(14px,env(safe-area-inset-left));top:max(14px,env(safe-area-inset-top));z-index:2;pointer-events:none}
+#title{font-size:12px;font-weight:800;letter-spacing:.16em}
+#status{margin-top:5px;font-size:12px;color:#9ba9bc}
+#scale{position:absolute;right:max(14px,env(safe-area-inset-right));top:max(14px,env(safe-area-inset-top));font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace;color:#aebbd0;z-index:2;pointer-events:none}
+#hint{position:absolute;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(94%,650px);padding:9px 13px;border:1px solid rgba(255,255,255,.12);border-radius:999px;background:rgba(3,7,17,.68);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);text-align:center;font-size:12px;color:#bdc8d8;z-index:2;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="app">
+<canvas id="space"></canvas>
+<div id="hud"><div id="title">COSMIC TASK BRAIN · FIXTURE 05</div><div id="status">Trackpad: 2-finger slide pans · pinch zooms · Touch: drag pans · pinch zooms</div></div>
+<div id="scale">1.00×</div>
+<div id="hint">Pan the Solar System. Dive into the Sun or a planet to reveal its physical layers.</div>
+</div>
+<script>
+(()=>{
+"use strict";
+const app=document.getElementById("app"), canvas=document.getElementById("space"), ctx=canvas.getContext("2d"), scaleEl=document.getElementById("scale");
+let dpr=1,W=0,H=0,zoom=.72,camX=0,camY=0,initialized=false;
+const MIN=.10,MAX=85;
+const planets=[
+{x:145,y:-82,r:12,c:"#9b948a",n:"Mercury",kind:"mercury"},
+{x:-205,y:105,r:17,c:"#c48958",n:"Venus",kind:"venus"},
+{x:115,y:215,r:20,c:"#5e91b1",n:"Earth",kind:"earth"},
+{x:-320,y:-145,r:16,c:"#a85e49",n:"Mars",kind:"mars"},
+{x:410,y:145,r:35,c:"#c49a70",n:"Jupiter",kind:"jupiter"},
+{x:-480,y:210,r:28,c:"#c9b78d",ring:1,n:"Saturn",kind:"saturn"},
+{x:515,y:-270,r:24,c:"#73aab0",n:"Uranus",kind:"uranus"},
+{x:-625,y:-255,r:23,c:"#5273ad",n:"Neptune",kind:"neptune"},
+{x:690,y:300,r:12,c:"#8c7467",n:"Pluto",kind:"pluto"}];
+const orbits=[[165,105,-.18],[245,150,.14],[335,205,-.31],[430,255,.23],[535,315,-.12],[655,380,.28],[760,440,-.21]];
+let seed=1337;const stars=[];function rnd(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
+for(let i=0;i<450;i++)stars.push({x:(rnd()-.5)*4000,y:(rnd()-.5)*3000,r:.4+rnd()*1.4,a:.18+rnd()*.7});
+const w2s=(x,y)=>({x:x*zoom+camX,y:y*zoom+camY});
+const s2w=(x,y)=>({x:(x-camX)/zoom,y:(y-camY)/zoom});
+function resize(){dpr=Math.min(3,devicePixelRatio||1);W=innerWidth;H=innerHeight;canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+"px";canvas.style.height=H+"px";ctx.setTransform(dpr,0,0,dpr,0,0);if(!initialized){camX=W/2;camY=H/2;initialized=true}draw()}
+
+function layerView(kind,q,r){
+ if(zoom<2.5)return;
+ const clamp=v=>Math.max(0,Math.min(1,v));
+ const f=(a,b)=>clamp((zoom-a)/(b-a));
+ const R=Math.min(Math.max(r*.62,55),Math.min(W,H)*.38);
+ const disc=(rr,col,a)=>{ctx.save();ctx.globalAlpha=a;ctx.fillStyle=col;ctx.beginPath();ctx.arc(q.x,q.y,rr,0,Math.PI*2);ctx.fill();ctx.restore()};
+ const txt=(t,y,a)=>{ctx.save();ctx.globalAlpha=a;ctx.fillStyle="#f4f7fb";ctx.font="700 11px -apple-system,sans-serif";ctx.textAlign="center";ctx.fillText(t,q.x,y);ctx.restore()};
+ let L=[];
+ if(kind==="sun")L=[["PHOTOSPHERE","#ffb32c"],["CONVECTION ZONE","#f28b22"],["RADIATIVE ZONE","#ffd467"],["CORE","#fff0aa"]];
+ if(kind==="mercury")L=[["CRATERED CRUST","#8f857c"],["SILICATE MANTLE","#765a48"],["IRON-RICH CORE","#d39a63"]];
+ if(kind==="venus")L=[["CO₂ CLOUDS","#ddd0a5"],["VOLCANIC CRUST","#9b5c36"],["ROCKY MANTLE","#c56d39"],["METALLIC CORE","#e0a05d"]];
+ if(kind==="earth")L=[["ATMOSPHERE + CLOUDS","#d9efff"],["LAND + OCEAN","#3976a7"],["CRUST","#80533a"],["MANTLE","#d26e37"],["OUTER CORE","#e9a24e"],["INNER CORE","#f4cf76"]];
+ if(kind==="mars")L=[["THIN CO₂ + DUST","#c46b4d"],["BASALTIC CRUST","#7e382a"],["ROCKY MANTLE","#aa5a39"],["IRON-SULFUR CORE","#d18b58"]];
+ if(kind==="jupiter")L=[["AMMONIA CLOUDS","#d7ad7c"],["H₂ / He ATMOSPHERE","#b77c58"],["METALLIC HYDROGEN","#707b91"],["DENSE CORE REGION","#c7b8a2"]];
+ if(kind==="saturn")L=[["AMMONIA CLOUDS","#e2cc96"],["H₂ / He ATMOSPHERE","#b69b73"],["METALLIC HYDROGEN","#75808c"],["DENSE CORE REGION","#c5b49d"]];
+ if(kind==="uranus")L=[["HAZY H₂ / He / METHANE","#79c8cf"],["ICY FLUID MANTLE","#527a91"],["ROCKY CORE","#aa9a87"]];
+ if(kind==="neptune")L=[["STORMY H₂ / He / METHANE","#3767bd"],["ICY FLUID MANTLE","#466b8d"],["ROCKY CORE","#a79784"]];
+ if(kind==="pluto")L=[["N₂ / CH₄ ICE","#d8c5ad"],["WATER-ICE CRUST","#a78e77"],["ROCKY INTERIOR","#77675c"]];
+ if(!L.length)return;
+ const exterior=1-f(3.0,7.0);
+ ctx.save();
+ // Cutaway-like nested layers: each deeper shell becomes dominant with zoom.
+ for(let i=0;i<L.length;i++){
+   const start=3.0+i*3.8, a=f(start,start+2.5);
+   const rr=R*(1-i*.14);
+   disc(rr,L[i][1],Math.max(.08,a*.92));
+   if(zoom>start+1) txt(L[i][0],q.y-R*.72+i*22,f(start+1,start+2.8));
+ }
+ ctx.restore();
+}
+
+function draw(){
+ctx.clearRect(0,0,W,H);ctx.fillStyle="#02040a";ctx.fillRect(0,0,W,H);
+for(const s of stars){const p=w2s(s.x,s.y);if(p.x<-4||p.x>W+4||p.y<-4||p.y>H+4)continue;ctx.globalAlpha=s.a;ctx.fillStyle="#edf5ff";ctx.beginPath();ctx.arc(p.x,p.y,Math.max(.4,s.r*Math.min(1.3,Math.sqrt(zoom))),0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1;
+const c=w2s(0,0);ctx.save();ctx.translate(c.x,c.y);for(const [rx,ry,rot] of orbits){ctx.save();ctx.rotate(rot);ctx.strokeStyle="rgba(126,151,184,.22)";ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(0,0,rx*zoom,ry*zoom,0,0,Math.PI*2);ctx.stroke();ctx.restore()}ctx.restore();
+const sr=Math.max(3,52*zoom),g=ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,sr*2.3);g.addColorStop(0,"rgba(255,213,92,.95)");g.addColorStop(.4,"rgba(244,168,52,.8)");g.addColorStop(1,"rgba(244,168,52,0)");ctx.fillStyle=g;ctx.beginPath();ctx.arc(c.x,c.y,sr*2.3,0,Math.PI*2);ctx.fill();ctx.fillStyle="#f3b743";ctx.beginPath();ctx.arc(c.x,c.y,sr,0,Math.PI*2);ctx.fill();layerView("sun",c,sr);
+for(const p of planets){const q=w2s(p.x,p.y),r=Math.max(3,p.r*zoom);if(q.x+r*3<0||q.x-r*3>W||q.y+r*3<0||q.y-r*3>H)continue;if(p.ring){ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-.22);ctx.strokeStyle="rgba(213,196,153,.72)";ctx.lineWidth=Math.max(1,5*zoom);ctx.beginPath();ctx.ellipse(0,0,r*1.8,r*.55,0,0,Math.PI*2);ctx.stroke();ctx.restore()}const pg=ctx.createRadialGradient(q.x-r*.3,q.y-r*.35,r*.05,q.x,q.y,r);pg.addColorStop(0,"#e9f0f5");pg.addColorStop(.18,p.c);pg.addColorStop(1,"#17202b");ctx.fillStyle=pg;ctx.beginPath();ctx.arc(q.x,q.y,r,0,Math.PI*2);ctx.fill();layerView(p.kind,q,r);if(zoom>1.7){ctx.fillStyle="rgba(230,239,250,.82)";ctx.font="600 12px -apple-system,sans-serif";ctx.textAlign="center";ctx.fillText(p.n,q.x,q.y+r+18)}}
+scaleEl.textContent=zoom.toFixed(2)+"×";
+}
+const pointers=new Map();let drag=null,pinch=null;
+function mid(){const a=[...pointers.values()];return{x:(a[0].x+a[1].x)/2,y:(a[0].y+a[1].y)/2}}
+function dist(){const a=[...pointers.values()];return Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)}
+app.addEventListener("pointerdown",e=>{e.preventDefault();try{app.setPointerCapture(e.pointerId)}catch(_){}pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1)drag={x:e.clientX,y:e.clientY,cx:camX,cy:camY};else if(pointers.size===2){const m=mid();pinch={d:dist(),z:zoom,a:s2w(m.x,m.y)};drag=null}},{passive:false});
+app.addEventListener("pointermove",e=>{if(!pointers.has(e.pointerId))return;e.preventDefault();pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1&&drag){camX=drag.cx+e.clientX-drag.x;camY=drag.cy+e.clientY-drag.y;draw()}else if(pointers.size===2&&pinch){const m=mid(),nz=Math.max(MIN,Math.min(MAX,pinch.z*dist()/Math.max(1,pinch.d)));zoom=nz;camX=m.x-pinch.a.x*zoom;camY=m.y-pinch.a.y*zoom;draw()}},{passive:false});
+function end(e){if(!pointers.has(e.pointerId))return;e.preventDefault();pointers.delete(e.pointerId);if(pointers.size===1){const p=[...pointers.values()][0];drag={x:p.x,y:p.y,cx:camX,cy:camY};pinch=null}else{drag=null;pinch=null}}
+app.addEventListener("pointerup",end,{passive:false});app.addEventListener("pointercancel",end,{passive:false});
+
+/*
+ Mac trackpad:
+ Safari emits ordinary two-finger scrolling as wheel events with ctrlKey=false.
+ Trackpad pinch-to-zoom is exposed as wheel events with ctrlKey=true.
+ Treat them as DIFFERENT spatial axes.
+*/
+app.addEventListener("wheel",e=>{
+e.preventDefault();
+if(e.ctrlKey){
+  const anchor=s2w(e.clientX,e.clientY);
+  const factor=Math.exp(-e.deltaY*.012);
+  zoom=Math.max(MIN,Math.min(MAX,zoom*factor));
+  camX=e.clientX-anchor.x*zoom;
+  camY=e.clientY-anchor.y*zoom;
+}else{
+  // Natural "grab the field" behavior: content follows the trackpad gesture.
+  camX-=e.deltaX;
+  camY-=e.deltaY;
+}
+draw();
+},{passive:false});
+
+// Safari/macOS trackpad pinch support.
+// Safari exposes trackpad pinch through gesturestart/gesturechange.
+// Keep the world point under the gesture center fixed while scale changes.
+let safariGesture = null;
+
+document.addEventListener("gesturestart", e => {
+  e.preventDefault();
+  const x = (typeof e.clientX === "number" && e.clientX) ? e.clientX : W / 2;
+  const y = (typeof e.clientY === "number" && e.clientY) ? e.clientY : H / 2;
+  safariGesture = {
+    startZoom: zoom,
+    anchor: s2w(x, y),
+    x, y
+  };
+}, {passive:false});
+
+document.addEventListener("gesturechange", e => {
+  e.preventDefault();
+  if (!safariGesture) return;
+  const x = (typeof e.clientX === "number" && e.clientX) ? e.clientX : safariGesture.x;
+  const y = (typeof e.clientY === "number" && e.clientY) ? e.clientY : safariGesture.y;
+  zoom = Math.max(MIN, Math.min(MAX, safariGesture.startZoom * e.scale));
+  camX = x - safariGesture.anchor.x * zoom;
+  camY = y - safariGesture.anchor.y * zoom;
+  draw();
+}, {passive:false});
+
+document.addEventListener("gestureend", e => {
+  e.preventDefault();
+  safariGesture = null;
+}, {passive:false});
+app.addEventListener("contextmenu",e=>e.preventDefault());
+addEventListener("resize",resize,{passive:true});resize();
+})();
+</script>
+</body>
+</html>
