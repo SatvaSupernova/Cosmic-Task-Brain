@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#02040a">
+<title>Cosmic Task Brain — Spatial Fixture</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#02040a;color:#eef4ff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overscroll-behavior:none}
+body,#app,canvas{touch-action:none}
+#app{position:fixed;inset:0;overflow:hidden;background:radial-gradient(circle at 50% 45%,#08111f 0,#030711 48%,#010207 100%);user-select:none;-webkit-user-select:none}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#hud{position:absolute;left:max(14px,env(safe-area-inset-left));top:max(14px,env(safe-area-inset-top));z-index:2;pointer-events:none}
+#title{font-size:12px;font-weight:800;letter-spacing:.16em}
+#status{margin-top:5px;font-size:12px;color:#9ba9bc}
+#scale{position:absolute;right:max(14px,env(safe-area-inset-right));top:max(14px,env(safe-area-inset-top));font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace;color:#aebbd0;z-index:2;pointer-events:none}
+#hint{position:absolute;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(94%,650px);padding:9px 13px;border:1px solid rgba(255,255,255,.12);border-radius:999px;background:rgba(3,7,17,.68);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);text-align:center;font-size:12px;color:#bdc8d8;z-index:2;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="app">
+<canvas id="space"></canvas>
+<div id="hud"><div id="title">COSMIC TASK BRAIN · FIXTURE 04</div><div id="status">Trackpad: 2-finger slide pans · pinch zooms · Touch: drag pans · pinch zooms</div></div>
+<div id="scale">1.00×</div>
+<div id="hint">Move across space. Dive toward a planet and watch its internal task structure emerge.</div>
+</div>
+<script>
+(()=>{
+"use strict";
+const app=document.getElementById("app"), canvas=document.getElementById("space"), ctx=canvas.getContext("2d"), scaleEl=document.getElementById("scale");
+let dpr=1,W=0,H=0,zoom=.72,camX=0,camY=0,initialized=false;
+const MIN=.16,MAX=40;
+const planets=[
+{x:145,y:-82,r:12,c:"#9b948a",n:"P1"},{x:-205,y:105,r:17,c:"#c48958",n:"P2"},
+{x:115,y:215,r:20,c:"#5e91b1",n:"P3"},{x:-320,y:-145,r:16,c:"#a85e49",n:"P4"},
+{x:410,y:145,r:35,c:"#c49a70",n:"P5"},{x:-480,y:210,r:28,c:"#c9b78d",ring:1,n:"P6"},
+{x:515,y:-270,r:24,c:"#73aab0",n:"P7"},{x:-625,y:-255,r:23,c:"#5273ad",n:"P8"},
+{x:690,y:300,r:12,c:"#8c7467",n:"P9"}];
+const orbits=[[165,105,-.18],[245,150,.14],[335,205,-.31],[430,255,.23],[535,315,-.12],[655,380,.28],[760,440,-.21]];
+let seed=1337;const stars=[];function rnd(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
+for(let i=0;i<450;i++)stars.push({x:(rnd()-.5)*4000,y:(rnd()-.5)*3000,r:.4+rnd()*1.4,a:.18+rnd()*.7});
+const w2s=(x,y)=>({x:x*zoom+camX,y:y*zoom+camY});
+const s2w=(x,y)=>({x:(x-camX)/zoom,y:(y-camY)/zoom});
+function resize(){dpr=Math.min(3,devicePixelRatio||1);W=innerWidth;H=innerHeight;canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+"px";canvas.style.height=H+"px";ctx.setTransform(dpr,0,0,dpr,0,0);if(!initialized){camX=W/2;camY=H/2;initialized=true}draw()}
+function draw(){
+ctx.clearRect(0,0,W,H);ctx.fillStyle="#02040a";ctx.fillRect(0,0,W,H);
+for(const s of stars){const p=w2s(s.x,s.y);if(p.x<-4||p.x>W+4||p.y<-4||p.y>H+4)continue;ctx.globalAlpha=s.a;ctx.fillStyle="#edf5ff";ctx.beginPath();ctx.arc(p.x,p.y,Math.max(.4,s.r*Math.min(1.3,Math.sqrt(zoom))),0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1;
+const c=w2s(0,0);ctx.save();ctx.translate(c.x,c.y);for(const [rx,ry,rot] of orbits){ctx.save();ctx.rotate(rot);ctx.strokeStyle="rgba(126,151,184,.22)";ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(0,0,rx*zoom,ry*zoom,0,0,Math.PI*2);ctx.stroke();ctx.restore()}ctx.restore();
+const sr=Math.max(3,52*zoom),g=ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,sr*2.3);g.addColorStop(0,"rgba(255,213,92,.95)");g.addColorStop(.4,"rgba(244,168,52,.8)");g.addColorStop(1,"rgba(244,168,52,0)");ctx.fillStyle=g;ctx.beginPath();ctx.arc(c.x,c.y,sr*2.3,0,Math.PI*2);ctx.fill();ctx.fillStyle="#f3b743";ctx.beginPath();ctx.arc(c.x,c.y,sr,0,Math.PI*2);ctx.fill();
+for(const p of planets){const q=w2s(p.x,p.y),r=Math.max(3,p.r*zoom);if(q.x+r*3<0||q.x-r*3>W||q.y+r*3<0||q.y-r*3>H)continue;if(p.ring){ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-.22);ctx.strokeStyle="rgba(213,196,153,.72)";ctx.lineWidth=Math.max(1,5*zoom);ctx.beginPath();ctx.ellipse(0,0,r*1.8,r*.55,0,0,Math.PI*2);ctx.stroke();ctx.restore()}const pg=ctx.createRadialGradient(q.x-r*.3,q.y-r*.35,r*.05,q.x,q.y,r);pg.addColorStop(0,"#e9f0f5");pg.addColorStop(.18,p.c);pg.addColorStop(1,"#17202b");ctx.fillStyle=pg;ctx.beginPath();ctx.arc(q.x,q.y,r,0,Math.PI*2);ctx.fill();if(zoom>1.7){ctx.fillStyle="rgba(230,239,250,.82)";ctx.font="600 12px -apple-system,sans-serif";ctx.textAlign="center";ctx.fillText(p.n,q.x,q.y+r+18)}if(zoom>3.2){
+  // FIXTURE 04: semantic zoom. Structure emerges from the existing object.
+  const reveal=Math.min(1,(zoom-3.2)/2.8);
+  const deep=Math.min(1,Math.max(0,(zoom-6.0)/3.5));
+  const rr=Math.max(22,r*1.9);
+  ctx.save();
+  ctx.globalAlpha=.18+.55*reveal;
+  ctx.strokeStyle="rgba(185,215,255,.55)";
+  ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.arc(q.x,q.y,rr,0,Math.PI*2);ctx.stroke();
+
+  const nodes=[
+    {a:-1.35,d:1.55,label:"PLAN"},
+    {a:-.20,d:1.72,label:"BUILD"},
+    {a:.92,d:1.58,label:"TEST"},
+    {a:2.25,d:1.70,label:"SHIP"}
+  ];
+  for(const node of nodes){
+    const nx=q.x+Math.cos(node.a)*rr*node.d;
+    const ny=q.y+Math.sin(node.a)*rr*node.d;
+    ctx.strokeStyle="rgba(177,207,245,.42)";
+    ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(nx,ny);ctx.stroke();
+    ctx.fillStyle="rgba(7,13,25,.94)";
+    ctx.beginPath();ctx.arc(nx,ny,Math.max(6,7+4*reveal),0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle="rgba(220,235,255,.72)";
+    ctx.beginPath();ctx.arc(nx,ny,Math.max(6,7+4*reveal),0,Math.PI*2);ctx.stroke();
+
+    if(zoom>4.7){
+      ctx.globalAlpha=.35+.65*reveal;
+      ctx.fillStyle="#e8f2ff";
+      ctx.font="700 9px -apple-system,sans-serif";
+      ctx.textAlign="center";
+      ctx.fillText(node.label,nx,ny+24);
+    }
+
+    if(deep>0){
+      const subAngles=[node.a-.28,node.a+.28];
+      for(let si=0;si<2;si++){
+        const sx=nx+Math.cos(subAngles[si])*34*deep;
+        const sy=ny+Math.sin(subAngles[si])*34*deep;
+        ctx.globalAlpha=.18+.62*deep;
+        ctx.strokeStyle="rgba(168,199,236,.42)";
+        ctx.beginPath();ctx.moveTo(nx,ny);ctx.lineTo(sx,sy);ctx.stroke();
+        ctx.fillStyle="rgba(205,225,248,.9)";
+        ctx.beginPath();ctx.arc(sx,sy,2.5+2.2*deep,0,Math.PI*2);ctx.fill();
+      }
+    }
+  }
+  ctx.restore();
+}}
+scaleEl.textContent=zoom.toFixed(2)+"×";
+}
+const pointers=new Map();let drag=null,pinch=null;
+function mid(){const a=[...pointers.values()];return{x:(a[0].x+a[1].x)/2,y:(a[0].y+a[1].y)/2}}
+function dist(){const a=[...pointers.values()];return Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)}
+app.addEventListener("pointerdown",e=>{e.preventDefault();try{app.setPointerCapture(e.pointerId)}catch(_){}pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1)drag={x:e.clientX,y:e.clientY,cx:camX,cy:camY};else if(pointers.size===2){const m=mid();pinch={d:dist(),z:zoom,a:s2w(m.x,m.y)};drag=null}},{passive:false});
+app.addEventListener("pointermove",e=>{if(!pointers.has(e.pointerId))return;e.preventDefault();pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1&&drag){camX=drag.cx+e.clientX-drag.x;camY=drag.cy+e.clientY-drag.y;draw()}else if(pointers.size===2&&pinch){const m=mid(),nz=Math.max(MIN,Math.min(MAX,pinch.z*dist()/Math.max(1,pinch.d)));zoom=nz;camX=m.x-pinch.a.x*zoom;camY=m.y-pinch.a.y*zoom;draw()}},{passive:false});
+function end(e){if(!pointers.has(e.pointerId))return;e.preventDefault();pointers.delete(e.pointerId);if(pointers.size===1){const p=[...pointers.values()][0];drag={x:p.x,y:p.y,cx:camX,cy:camY};pinch=null}else{drag=null;pinch=null}}
+app.addEventListener("pointerup",end,{passive:false});app.addEventListener("pointercancel",end,{passive:false});
+
+/*
+ Mac trackpad:
+ Safari emits ordinary two-finger scrolling as wheel events with ctrlKey=false.
+ Trackpad pinch-to-zoom is exposed as wheel events with ctrlKey=true.
+ Treat them as DIFFERENT spatial axes.
+*/
+app.addEventListener("wheel",e=>{
+e.preventDefault();
+if(e.ctrlKey){
+  const anchor=s2w(e.clientX,e.clientY);
+  const factor=Math.exp(-e.deltaY*.012);
+  zoom=Math.max(MIN,Math.min(MAX,zoom*factor));
+  camX=e.clientX-anchor.x*zoom;
+  camY=e.clientY-anchor.y*zoom;
+}else{
+  // Natural "grab the field" behavior: content follows the trackpad gesture.
+  camX-=e.deltaX;
+  camY-=e.deltaY;
+}
+draw();
+},{passive:false});
+
+// Safari/macOS trackpad pinch support.
+// Safari exposes trackpad pinch through gesturestart/gesturechange.
+// Keep the world point under the gesture center fixed while scale changes.
+let safariGesture = null;
+
+document.addEventListener("gesturestart", e => {
+  e.preventDefault();
+  const x = (typeof e.clientX === "number" && e.clientX) ? e.clientX : W / 2;
+  const y = (typeof e.clientY === "number" && e.clientY) ? e.clientY : H / 2;
+  safariGesture = {
+    startZoom: zoom,
+    anchor: s2w(x, y),
+    x, y
+  };
+}, {passive:false});
+
+document.addEventListener("gesturechange", e => {
+  e.preventDefault();
+  if (!safariGesture) return;
+  const x = (typeof e.clientX === "number" && e.clientX) ? e.clientX : safariGesture.x;
+  const y = (typeof e.clientY === "number" && e.clientY) ? e.clientY : safariGesture.y;
+  zoom = Math.max(MIN, Math.min(MAX, safariGesture.startZoom * e.scale));
+  camX = x - safariGesture.anchor.x * zoom;
+  camY = y - safariGesture.anchor.y * zoom;
+  draw();
+}, {passive:false});
+
+document.addEventListener("gestureend", e => {
+  e.preventDefault();
+  safariGesture = null;
+}, {passive:false});
+app.addEventListener("contextmenu",e=>e.preventDefault());
+addEventListener("resize",resize,{passive:true});resize();
+})();
+</script>
+</body>
+</html>
